@@ -11,24 +11,45 @@
 ; @file src/helpers/stats.art
 ;===============================================
 
-hasOutliers?: function [smpl, avg, dev][
-    tripledev: 3 * dev
+; based on the "modified z-score" (Iglewicz & Hoaglin):
+; the distance of each value from the median, scaled by the
+; median absolute deviation (MAD). Unlike a z-score based on
+; the standard deviation, the outliers themselves cannot
+; "hide" each other: with 3-sigma, an outlier could never be
+; detected for 10 runs or fewer, for example.
+hasOutliers?: function [smpl, med][
+    ; with less than 5 runs, there's not enough data to tell
+    ; what's "normal" and what's not
+    if 5 > size smpl -> return false
 
-    positive? enumerate smpl 'sv [
-        not? between? sv (avg - tripledev) (avg + tripledev)
-    ]
+    deviations: map smpl 'sv -> abs sv - med
+
+    ; if more than half of the values are identical, MAD is 0,
+    ; so we go with the mean absolute deviation instead
+    mad: median deviations
+    scale: (positive? mad)? -> mad / 0.6745
+                            -> 1.253314 * average deviations
+
+    if zero? scale -> return false
+
+    ; the usual threshold is 3.5, but that's way too strict
+    ; for benchmarks: even normal system "noise" would end up
+    ; being reported. 14 is what Hyperfine uses as well
+    some? deviations 'dv -> 14 < dv / scale
 ]
 
 getStats: function [smpl][
     avg: average smpl
+    med: median smpl
     dev: deviation.sample smpl
     return #[
         data: #[
             avg: avg
+            median: med
             dev: dev
             min: min smpl
             max: max smpl
         ]
-        outliers?: hasOutliers? smpl avg dev 
+        outliers?: hasOutliers? smpl med
     ]
 ]
