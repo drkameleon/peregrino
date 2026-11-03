@@ -81,7 +81,7 @@ Options:
     -c, --colorless             Don't use colored output 
 
         --markdown <file>       Export Markdown to given file 
-        --json <file>           Export Json to give file 
+        --json <file>           Export Json to given file 
 
     -h, --help                  Show this help screen 
     -v, --version               Print version 
