@@ -29,6 +29,13 @@ nicefloat: function [num][
     to :string .format:".2f" round.to: 2 to :floating num
 ]
 
+withUnit: function [ms][
+    ; e.g. 11.6 => "11.60 ms", 1234.5 => "1.23 s"
+    t: to :floating ms
+    (t < 1000)? -> (nicefloat t) ++ " ms"
+               -> (nicefloat t / 1000) ++ " s"
+]
+
 truncateLeft: function [str,lim][
     if lim >= size str -> return str
     pref: "..."
