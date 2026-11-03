@@ -39,8 +39,20 @@ Peregrino comes in a *hybrid* package; that is: you may use it as a library (via
 ```red
 import {peregrino}!
 
-P: to :peregrino @["command one", "command two"]!
-P\benchmark ; and that's it!
+P: to :peregrino @[["command one" "command two"]]!
+P\benchmark ø ; and that's it!
+```
+
+If you want a specific number of runs (instead of letting Peregrino figure it out), just pass it to `benchmark`:
+
+```red
+P\benchmark 10
+```
+
+Or, even simpler:
+
+```red
+peregrino ["command one" "command two"]
 ```
 
 #### From the terminal
