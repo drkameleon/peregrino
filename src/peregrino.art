@@ -40,6 +40,7 @@ define :peregrino [
 
         \final: []
         \ignoreFailure?: not? null? attr 'ignoreFailure
+        \warmupRuns: (attr 'warmup) ?? 1
         
         \minimal?: not? null? attr 'minimal
         \ascii?: not? null? attr 'ascii
@@ -314,15 +315,19 @@ define :peregrino [
         return median calvalues
     ]
 
-    warmup: function [cmd][
-        ; run the command (without measuring it), to make sure it works
-        ; + get an idea of how long it takes
+    warmup: function [cmd, needed?][
+        ; run the command (without measuring it), to make sure it works,
+        ; let it fill any caches + get an idea of how long it takes
+        ; (if we have to figure out the number of runs, we need at least 1)
+        warmupRuns: (needed?)? -> max @[1, \warmupRuns] -> \warmupRuns
+        if zero? warmupRuns -> return null
+
         timings: []
         exitCodes: []
         if \ascii? -> do [.plain]
         if \colorless? -> do [.colorless]
         if \minimal? -> do [.simple .hide]
-        progressive\loop .ratioless .label: pad.right "Warming up:" 20 1 'x [
+        progressive\loop .ratioless .label: pad.right "Warming up:" 20 warmupRuns 'x [
             'timings ++ to :floating scalar benchmark.get [
                 result: execute.code cmd
             ]
@@ -339,6 +344,15 @@ define :peregrino [
         return average timings
     ]
 
+    calculateRuns: function [timeForOne][
+        ; as many runs as fit in ~3 seconds
+        ; (commands taking less than 1ms would lead to a division by zero)
+        minimumRunningTime: 3000
+        calculatedTimes: to :integer minimumRunningTime / max @[1.0, timeForOne]
+
+        return (zero? calculatedTimes)? -> 3 -> calculatedTimes
+    ]
+
     benchmark: method [times][
         unless null? times ->
             if times < 1 -> throw "Number of runs must be at least 1"
@@ -348,20 +362,15 @@ define :peregrino [
             \printHeader "benchmarks"
         ]
 
-        minimumRunningTime: 3000
-
         calibrator: \calibrate
 
         loop.with:'commandId \commands 'command [
             
             samples: []
-            timeForOne: \warmup command
+            timeForOne: \warmup command null? times
 
             ; (commands taking less than 1ms would lead to a division by zero)
-            if zero? calculatedTimes: <= to :integer minimumRunningTime / max @[1.0, timeForOne] ->
-                calculatedTimes: 3
-
-            runs: times ?? calculatedTimes
+            runs: times ?? \calculateRuns timeForOne
             
             if \ascii? -> do [.plain]
             if \colorless? -> do [.colorless]

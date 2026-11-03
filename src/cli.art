@@ -85,6 +85,7 @@ cmd: to :cmdline #[
         @["r" "run"         [:integer] "times"      "Specify number of times to run each command"   ø]
         @["f" "file"        [:logical] ""           "Read commands from text file (one per line)"   false]
         @["p" "params"      [:string]  "string"     "Use custom params in command"                  ""]
+        @["w" "warmup"      [:integer] "times"      "Number of warm-up runs, before benchmarking"   1]
         @["i" "ignore-failure" [:logical] ""        "Ignore non-zero exit codes"                    false]
         ø
         @["m" "minimal"     [:logical] ""           "No fancy output; just the data!"               false]
@@ -101,6 +102,7 @@ if optAscii -> do [.ascii]
 if optColorless -> do [.colorless]
 if optMinimal -> do [.minimal]
 if optIgnoreFailure -> do [.ignoreFailure]
+do @[to :attributeLabel "warmup" optWarmup]
 
 if empty? optValues ->
     cmd\showError "Not enough arguments"
@@ -108,6 +110,9 @@ if empty? optValues ->
 unless null? optRun ->
     if optRun < 1 ->
         cmd\showError "Number of runs must be at least 1"
+
+if optWarmup < 0 ->
+    cmd\showError "Number of warm-up runs cannot be negative"
 
 pr: to :peregrino @[getCommands]!
 
