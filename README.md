@@ -2,7 +2,7 @@
 <p align="center">
      Lightning-fast command-line<br>benchmarking tool & library for Arturo
      <br><br>
-     <img src="https://img.shields.io/github/license/arturo-lang/grafito?style=for-the-badge">
+     <img src="https://img.shields.io/github/license/drkameleon/peregrino?style=for-the-badge">
     <a href="https://github.com/arturo-lang/arturo" style="text-decoration: none; display: inline-block;"><img src="https://img.shields.io/badge/language-Arturo-6A156B.svg?style=for-the-badge" alt="Language"/></a>
 </p>
 
@@ -17,6 +17,8 @@
 * [How do I use it?](#how-do-i-use-it)
    - [As a library](#as-a-library)
    - [From the terminal](#from-the-terminal)
+   - [Some examples](#some-examples)
+* [How does it work?](#how-does-it-work)
 * [License](#license)   
 
 <!--te-->
@@ -25,7 +27,7 @@
 
 ### What does this package do?
 
-This is a benchmarker tool to help you measure and compare different scripts, in an ultra-customizeable way, see the results in an intuitive way and... even export them (Json & Markdown supported so far!) in case you want to keep them for further processing.
+This is a benchmarker tool to help you measure and compare different scripts, in an ultra-customizeable way, see the results in an intuitive way and... even export them (Json, CSV & Markdown supported so far!) in case you want to keep them for further processing.
 
 > [!NOTE]
 > Peregrino has shamelessly been inspired by a tool I personally love: [Hyperfine](https://github.com/sharkdp/hyperfine). See it mostly as a double personal challenge: a) see how easily this could be done in Arturo, using what we already have, and... b) make something even better and more user-friendly!
@@ -33,6 +35,9 @@ This is a benchmarker tool to help you measure and compare different scripts, in
 ### How do I use it?
 
 Peregrino comes in a *hybrid* package; that is: you may use it as a library (via `import`), or you can actually run it via the command-line, after installing it.
+
+> [!IMPORTANT]
+> Peregrino needs one of the latest nightly builds of Arturo (anything after 0.10.0).
 
 #### As a library
 
@@ -54,6 +59,21 @@ Or, even simpler:
 ```red
 peregrino ["command one" "command two"]
 ```
+
+All of the command-line options are also available as attributes, when creating a new benchmarker:
+
+```red
+P: to :peregrino .minimal .warmup: 3 .timeout: 5000 @[["command one" "command two"]]!
+P\benchmark ø
+```
+
+- `.minimal`, `.ascii`, `.colorless` - for the output
+- `.warmup: <times>`, `.timeout: <ms>`, `.prepare: <cmd>` - for how commands are run
+- `.ignoreFailure` - for commands that are *expected* to fail
+
+When a command fails (or takes longer than `.timeout`), a `commandFailed` (or `commandTimedOut`) error is thrown - so you can catch it with `try`, if you want.
+
+Once you are done benchmarking, you may also export the results: `P\exportToJson "results"`, `P\exportToCsv "results"` or `P\exportToMarkdown "results"`.
 
 #### From the terminal
 
@@ -95,6 +115,62 @@ Options:
 > ```
 > peregrino --run:10 "some command" "another command" ...
 > ```
+
+#### Some examples
+
+Compare two commands - and let Peregrino figure out how many times to run each one (= as many runs as fit in ~3 seconds):
+
+```
+peregrino "sort data.txt" "sort -n data.txt"
+```
+
+Run each command exactly 20 times, after 3 warm-up runs (they are not measured, but they help with things like disk caches):
+
+```
+peregrino --run:20 --warmup:3 "grep -r TODO src" "rg TODO src"
+```
+
+Clear something before each and every run (this is not measured either):
+
+```
+peregrino --prepare:"rm -rf build" "make" "make -j4"
+```
+
+Give up on any command that takes longer than 10 seconds, instead of waiting forever:
+
+```
+peregrino --timeout:10000 "./slow-script.sh" "./fast-script.sh"
+```
+
+Benchmark a command that is *expected* to return a non-zero exit code (otherwise, Peregrino stops right away with an error):
+
+```
+peregrino -i "grep something-that-is-not-there file.txt"
+```
+
+Use parameters: every `|name|` in a command is replaced with each one of the given values (if more than one parameters are given, all possible combinations are tried):
+
+```
+peregrino --params:"n: [10 100 1000]" "seq |n|"
+```
+
+Read the commands from a file (one per line; empty lines are ignored) and export the results:
+
+```
+peregrino --file --json:results --markdown:results commands.txt
+```
+
+### How does it work?
+
+Here's what Peregrino does, in a nutshell:
+
+1. **Calibration** - first, we measure how long it takes to just spawn a shell (= the "cost" of running *any* command), so that we can subtract it from every single measurement afterwards. This is done once, for all commands.
+2. **Warm-up** - every command is run at least once (or `--warmup` times), without measuring anything. This way, we make sure it actually works, let it fill any caches and get an idea of how long it takes (= how many times we should run it, if `--run` isn't given). During this phase, commands run in the background, so that we can keep the progress bar "alive" (and stop a command, if it hits the `--timeout`).
+3. **Benchmarking** - every command is run as many times as needed and each run is measured.
+4. **Analysis** - for every command we get the average time, the standard deviation and the range (fastest/slowest run) + how it compares to the fastest one. If some of the runs look "weird" (e.g. because something else was running at the same time), they are marked with `(*)`; outliers are detected using the *modified z-score* (based on the median), just like Hyperfine does.
+
+> [!TIP]
+> For really fast commands (= faster than spawning a shell), the results may show up as 0ms: that basically means that the command itself costs nothing compared to the shell. For really accurate results on such commands, it's better to make them do more work (e.g. run them in a loop).
 
 <hr/>
 
