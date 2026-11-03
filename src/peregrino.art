@@ -24,6 +24,21 @@ import ./{helpers/styles}!
 ; exit successfully (= with a non-zero code)
 commandFailed: to :errorKind "Command failed"
 
+;---------------------------
+; A "bar" that doesn't draw
+; anything at all (= `.minimal`)
+;---------------------------
+
+define :silentBar [
+    init: method [][
+        \processing: ""
+        \message: ""
+        \label: ""
+    ]
+    increase: method [q][]
+    stop: method [][]
+]
+
 define :peregrino [
     init: method [commands][
         ; command-line values like `true` or `42`
@@ -293,19 +308,29 @@ define :peregrino [
             throw.as: commandFailed cmd ++ " (exit code: " ++ (to :string exitCode) ++ ")"
     ]
 
+    newBar: function [label, total, persistent?][
+        ; no bars at all, in minimal mode
+        ; (= just the data, e.g. when piping the output)
+        if \minimal? -> return to :silentBar []!
+
+        if \ascii? -> do [.plain]
+        if \colorless? -> do [.colorless]
+        (persistent?)? -> do [.keep] -> do [.ratioless]
+        return progressive\new .label: pad.right label 20 total!
+    ]
+
     calibrate: function [][
         ; measure the overhead of spawning a shell (just once, since it's
         ; the same for all commands), so that we can subtract it from every
         ; single run afterwards
         calvalues: []
-        if \ascii? -> do [.plain]
-        if \colorless? -> do [.colorless]
-        if \minimal? -> do [.simple .hide]
-        progressive\loop .ratioless .label: pad.right "Calibrating:" 20 20 'x [
+        bar: \newBar "Calibrating:" 20 false
+        loop 20 'x [
             pause 20
             'calvalues ++ to :floating scalar benchmark.get [
                 output: execute ""
             ]
+            bar\increase 1
         ]
         ; remove the (final) calibration line
         unless \minimal? ->
@@ -324,14 +349,13 @@ define :peregrino [
 
         timings: []
         exitCodes: []
-        if \ascii? -> do [.plain]
-        if \colorless? -> do [.colorless]
-        if \minimal? -> do [.simple .hide]
-        progressive\loop .ratioless .label: pad.right "Warming up:" 20 warmupRuns 'x [
+        bar: \newBar "Warming up:" warmupRuns false
+        loop warmupRuns 'x [
             'timings ++ to :floating scalar benchmark.get [
                 result: execute.code cmd
             ]
             'exitCodes ++ result\code
+            bar\increase 1
         ]
         ; remove the (final) warm-up line
         unless \minimal? ->
@@ -372,10 +396,7 @@ define :peregrino [
             ; (commands taking less than 1ms would lead to a division by zero)
             runs: times ?? \calculateRuns timeForOne
             
-            if \ascii? -> do [.plain]
-            if \colorless? -> do [.colorless]
-            (\minimal?)? -> do [.simple .hide] -> do [.keep]
-            bar: progressive\new .label:pad.right "Benchmarking:" 20 runs!
+            bar: \newBar "Benchmarking:" runs true
             bar\processing: \idealMsg commandId command
             bar\increase 0
             exitCode: 0
