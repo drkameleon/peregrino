@@ -76,6 +76,7 @@ Options:
     -w, --warmup <times>        Number of warm-up runs, before benchmarking (Default: 1) 
     -t, --timeout <ms>          Stop if a warm-up run takes longer than this 
     -i, --ignore-failure        Ignore non-zero exit codes 
+        --prepare <cmd>         Command to run before each run (not measured) 
 
     -m, --minimal               No fancy output; just the data! 
     -a, --ascii                 Use simple style, with ASCII-only characters 

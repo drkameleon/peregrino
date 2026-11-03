@@ -88,6 +88,7 @@ cmd: to :cmdline #[
         @["w" "warmup"      [:integer] "times"      "Number of warm-up runs, before benchmarking"   1]
         @["t" "timeout"     [:integer] "ms"         "Stop if a warm-up run takes longer than this"  ø]
         @["i" "ignore-failure" [:logical] ""        "Ignore non-zero exit codes"                    false]
+        @[""  "prepare"     [:string :logical :integer] "cmd" "Command to run before each run (not measured)" ""]
         ø
         @["m" "minimal"     [:logical] ""           "No fancy output; just the data!"               false]
         @["a" "ascii"       [:logical] ""           "Use simple style, with ASCII-only characters"  false]
@@ -106,6 +107,8 @@ if optIgnoreFailure -> do [.ignoreFailure]
 do @[to :attributeLabel "warmup" optWarmup]
 unless null? optTimeout ->
     do @[to :attributeLabel "timeout" optTimeout]
+unless empty? optPrepare: <= to :string optPrepare ->
+    do @[to :attributeLabel "prepare" optPrepare]
 
 if empty? optValues ->
     cmd\showError "Not enough arguments"
@@ -128,9 +131,9 @@ err: try [
 ]
 unless null? err [
     ; not one of ours, so let's not hide it
-    if err\kind = commandTimedOut [
+    if contains? @[commandTimedOut preparationFailed] err\kind [
         print ""
-        print [color #red "!" "Command timed out:" err\message]
+        print [color #red "!" (to :string err\kind) ++ ":" err\message]
         panic.unstyled.code: 1 ""
     ]
 
