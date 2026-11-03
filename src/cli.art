@@ -86,6 +86,7 @@ cmd: to :cmdline #[
         @["f" "file"        [:logical] ""           "Read commands from text file (one per line)"   false]
         @["p" "params"      [:string]  "string"     "Use custom params in command"                  ""]
         @["w" "warmup"      [:integer] "times"      "Number of warm-up runs, before benchmarking"   1]
+        @["t" "timeout"     [:integer] "ms"         "Stop if a warm-up run takes longer than this"  ø]
         @["i" "ignore-failure" [:logical] ""        "Ignore non-zero exit codes"                    false]
         ø
         @["m" "minimal"     [:logical] ""           "No fancy output; just the data!"               false]
@@ -103,6 +104,8 @@ if optColorless -> do [.colorless]
 if optMinimal -> do [.minimal]
 if optIgnoreFailure -> do [.ignoreFailure]
 do @[to :attributeLabel "warmup" optWarmup]
+unless null? optTimeout ->
+    do @[to :attributeLabel "timeout" optTimeout]
 
 if empty? optValues ->
     cmd\showError "Not enough arguments"
@@ -114,6 +117,10 @@ unless null? optRun ->
 if optWarmup < 0 ->
     cmd\showError "Number of warm-up runs cannot be negative"
 
+unless null? optTimeout ->
+    if optTimeout < 1 ->
+        cmd\showError "Timeout must be at least 1ms"
+
 pr: to :peregrino @[getCommands]!
 
 err: try [
@@ -121,6 +128,12 @@ err: try [
 ]
 unless null? err [
     ; not one of ours, so let's not hide it
+    if err\kind = commandTimedOut [
+        print ""
+        print [color #red "!" "Command timed out:" err\message]
+        panic.unstyled.code: 1 ""
+    ]
+
     if err\kind <> commandFailed ->
         throw.as: err\kind err\message
 

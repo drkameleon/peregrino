@@ -24,6 +24,42 @@ import ./{helpers/styles}!
 ; exit successfully (= with a non-zero code)
 commandFailed: to :errorKind "Command failed"
 
+; thrown when a command takes longer than the given `.timeout`
+commandTimedOut: to :errorKind "Command timed out"
+
+;---------------------------
+; Running in the background
+;---------------------------
+
+currentTime: function [][
+    ; current time, in milliseconds
+    t: now
+    (1000 * to :integer t) + t\nanosecond / 1000000
+]
+
+runInBackground: function [cmd, bar, limit][
+    ; run the command asynchronously, so that we can keep the bar
+    ; "alive" meanwhile + stop it, if it takes longer than `limit` ms
+    ; (not for measuring anything: we only know if a task is finished
+    ; every ~50ms)
+    task: execute.async.code cmd
+    started: currentTime
+    timedOut?: false
+
+    while [and? not? finished? task not? timedOut?][
+        pause 20
+        bar\increase 0
+        unless null? limit ->
+            timedOut?: limit < currentTime - started
+    ]
+
+    if timedOut? [
+        cancel task
+        return null
+    ]
+    return wait task
+]
+
 ;---------------------------
 ; A "bar" that doesn't draw
 ; anything at all (= `.minimal`)
@@ -56,6 +92,7 @@ define :peregrino [
         \final: []
         \ignoreFailure?: not? null? attr 'ignoreFailure
         \warmupRuns: (attr 'warmup) ?? 1
+        \timeout: attr 'timeout
         
         \minimal?: not? null? attr 'minimal
         \ascii?: not? null? attr 'ascii
@@ -349,23 +386,55 @@ define :peregrino [
 
         timings: []
         exitCodes: []
+        limit: \timeout
+        timedOut?: false
         bar: \newBar "Warming up:" warmupRuns false
         loop warmupRuns 'x [
-            'timings ++ to :floating scalar benchmark.get [
-                result: execute.code cmd
+            unless timedOut? [
+                'timings ++ to :floating scalar benchmark.get [
+                    result: runInBackground cmd bar limit
+                ]
+                timedOut?: null? result
+                unless timedOut? ->
+                    'exitCodes ++ result\code
             ]
-            'exitCodes ++ result\code
-            bar\increase 1
+            ; (not inside the conditional block on purpose: method calls
+            ; from there may end up going to a different bar)
+            step: (timedOut?)? -> 0 -> 1
+            bar\increase step
         ]
-        ; remove the (final) warm-up line
-        unless \minimal? ->
-            prints "\e[A\r\e[J"
+        minimal?: \minimal?
+        switch timedOut? [
+            ; the bar is still "in progress" (= details + bar lines),
+            ; so let's clear it + bring the cursor back
+            unless minimal? ->
+                prints "\r\e[A\e[J"
+            cursor true
+        ][
+            ; remove the (final) warm-up line
+            unless minimal? ->
+                prints "\e[A\r\e[J"
+        ]
+
+        ; a command that doesn't finish, cannot be benchmarked
+        ; (regardless of `.ignoreFailure`)
+        if timedOut? ->
+            ; (no string interpolation here: commands may well contain `|`s)
+            throw.as: commandTimedOut cmd ++ " (after " ++ (to :string limit) ++ "ms)"
 
         ; no need to go any further, if the command doesn't even work
         loop exitCodes 'exitCode ->
             \ensureSuccess cmd exitCode
 
-        return average timings
+        ; for very quick commands, the time we got from the background task
+        ; is not accurate at all, so let's measure one more run - normally
+        estimated: average timings
+        if estimated < 250 ->
+            estimated: to :floating scalar benchmark.get [
+                output: execute cmd
+            ]
+
+        return estimated
     ]
 
     calculateRuns: function [timeForOne][
