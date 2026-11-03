@@ -35,12 +35,24 @@ script: #[
 ; Helpers
 ;---------------------------
 
+renderWithParams: function [template, params][
+    ; replace every `|param|` with its value
+    ; (we don't use `export` + `render`, since `export` would end up
+    ; overwriting any of our own variables with the same name)
+    result: template
+    loop params [name, value] ->
+        result: replace result "|" ++ name ++ "|" to :string value
+    result
+]
+
 getCommands: function [][
     inputs: optValues
     if optFile [
         inputs: []
         loop optValues 'optV [
-            inputs: inputs ++ read.lines optV
+            ; (skipping empty lines)
+            inputs: inputs ++ select read.lines optV 'line ->
+                not? empty? strip line
         ]
     ]
     
@@ -54,10 +66,9 @@ getCommands: function [][
             ]
         ] 'dic -> dictionary.raw flatten dic
 
-        flatten unique map dicts 'dic [
-            export dic
+        unique flatten map dicts 'dic [
             map inputs 'val -> 
-                render val
+                renderWithParams val dic
         ]
     ][
         inputs
@@ -93,6 +104,10 @@ if optIgnoreFailure -> do [.ignoreFailure]
 
 if empty? optValues ->
     cmd\showError "Not enough arguments"
+
+unless null? optRun ->
+    if optRun < 1 ->
+        cmd\showError "Number of runs must be at least 1"
 
 pr: to :peregrino @[getCommands]!
 

@@ -29,7 +29,7 @@ define :peregrino [
         ; command-line values like `true` or `42`
         ; are not strings, so make sure they are
         \commands: map commands 'cmd -> to :string cmd
-        \stats: #[]
+        \stats: []
         \columns: @[
             #[header:"Command"      short:"Command"     format:{|filename| (*)}]
             #[header:"Average"      short:"Avg"         format:{|row\data\avg|}]
@@ -118,11 +118,11 @@ define :peregrino [
     ]
 
     finalizeData: method [][
-        stats: map \stats [k, v] [
+        stats: map \stats 'entry [
             ; a run can never take less than 0ms; if it did, it means
             ; that it took less than our calibration measurement (= the
             ; shell spawning overhead)
-            extend getStats map v 'x -> max @[0.0, x] #[cmd: k]
+            extend getStats map entry\runs 'x -> max @[0.0, x] #[cmd: entry\cmd]
         ]
         bestAvg: min map stats 'v -> v\data\avg
         loop stats 'v [
@@ -322,6 +322,9 @@ define :peregrino [
     ]
 
     benchmark: method [times][
+        unless null? times ->
+            if times < 1 -> throw "Number of runs must be at least 1"
+
         unless \minimal? [
             \printInfo
             \printHeader "benchmarks"
@@ -331,7 +334,7 @@ define :peregrino [
 
         loop.with:'commandId \commands 'command [
             
-            \stats\[command]: []
+            samples: []
             [calibrator, timeForOne]: \calibrate command
 
             ; (commands taking less than 1ms would lead to a division by zero)
@@ -348,20 +351,24 @@ define :peregrino [
             bar\increase 0
             exitCode: 0
             loop runs 'x [
-                \stats\[command]: \stats\[command] ++ (benchmark.get [
+                samples: samples ++ (benchmark.get [
                     result: execute.code command
                 ])
                 unless zero? result\code ->
                     exitCode: result\code
                 if x = runs [
-                    estimate: nicefloat max @[0.0, (average map \stats\[command] => scalar) - calibrator]
+                    estimate: nicefloat max @[0.0, (average map samples => scalar) - calibrator]
                     bar\message: \idealMsg commandId command
                     bar\label: (pad.right ~"~ |estimate|/run" 17) ++ pad.right \E\timer 3
                 ]
                 bar\increase 1
             ]
             \ensureSuccess command exitCode
-            \stats\[command]: map \stats\[command] 'v -> to :floating (scalar v) - calibrator
+            ; (one entry per command, even if the same command is given twice)
+            \stats: \stats ++ @[#[
+                cmd: command
+                runs: map samples 'v -> to :floating (scalar v) - calibrator
+            ]]
             unless \minimal? ->
                 prints "\n"
         ]
