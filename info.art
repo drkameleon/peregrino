@@ -1,6 +1,6 @@
 entry: {src/peregrino}
 executable: {src/cli}
 depends: [
-    [progressive >= 0.0.3]
+    [progressive >= 0.1.0]
 ]
 requires: [> 0.9.83]
