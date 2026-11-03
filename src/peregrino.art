@@ -11,6 +11,9 @@
 ; @file src/peregrino.art
 ;===============================================
 
+; current version (used by the CLI too)
+peregrinoVersion: "0.0.3"
+
 import {progressive}
 
 import ./{helpers/stats}
@@ -45,7 +48,7 @@ define :peregrino [
 
     printInfo: function [][
         print ""
-        print [\colored.bold #magenta "   Peregrino" ~"v/|script\version|"]
+        print [\colored.bold #magenta "   Peregrino" ~"v|peregrinoVersion|"]
         print ""
         print [\colored.bold #gray pad.right "   System :" 10 \colored #gray ~"|sys\cpu\arch|/|sys\os|"]
         print [\colored.bold #gray pad.right "   CPU    :" 10 \colored #gray to :string sys\cpu\cores \colored #gray "cores"]
