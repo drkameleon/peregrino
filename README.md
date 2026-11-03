@@ -73,6 +73,7 @@ Options:
     -r, --run <times>           Specify number of times to run each command 
     -f, --file                  Read commands from text file (one per line) 
     -p, --params <string>       Use custom params in command 
+    -w, --warmup <times>        Number of warm-up runs, before benchmarking (Default: 1) 
     -i, --ignore-failure        Ignore non-zero exit codes 
 
     -m, --minimal               No fancy output; just the data! 
