@@ -110,10 +110,20 @@ define :peregrino [
     ]
 
     finalizeData: method [][
-        stats: map \stats [k, v] -> extend getStats v #[cmd: k]
+        stats: map \stats [k, v] [
+            ; a run can never take less than 0ms; if it did, it means
+            ; that it took less than our calibration measurement (= the
+            ; shell spawning overhead)
+            extend getStats map v 'x -> max @[0.0, x] #[cmd: k]
+        ]
         bestAvg: min map stats 'v -> v\data\avg
         loop stats 'v [
-            v\data\rel: 100 * (v\data\avg - bestAvg) / bestAvg
+            ; there's no meaningful comparison against 0 (= null)
+            v\data\rel: switch zero? bestAvg [
+                (zero? v\data\avg)? -> 0.0 -> null
+            ][
+                100 * (v\data\avg - bestAvg) / bestAvg
+            ]
         ]
 
         stats: arrange stats 'stat -> stat\data\avg
@@ -122,7 +132,7 @@ define :peregrino [
             #[
                 cmd: v\cmd
                 data: #.raw flatten map v\data [kk,vv]->
-                    @[kk, nicefloat vv]
+                    @[kk, (null? vv)? -> "" -> nicefloat vv]
                 outliers?: v\outliers?
             ]
         ]
@@ -133,7 +143,7 @@ define :peregrino [
         loop \final 'entry [
             newEntry: new entry
             newEntry\data: #.raw flatten map newEntry\data [k,v][
-                @[k, to :floating v] 
+                @[k, (empty? v)? -> null -> to :floating v] 
             ]
             cleaned: cleaned ++ newEntry
         ]
@@ -209,9 +219,10 @@ define :peregrino [
                                 \colored #gray pad.center ~ c\format c\min + 2
                             ]
                             "Comparison" [
-                                ("+ 0.00%" = ~ c\format) ?
+                                txt: (empty? row\data\rel)? -> "n/a" -> ~ c\format
+                                ("+ 0.00%" = txt) ?
                                     -> pad.center "--" c\min + 2
-                                    -> pad.center ~ c\format c\min + 2
+                                    -> pad.center txt c\min + 2
                             ]
                             any [
                                 pad.center ~ c\format c\min + 2
@@ -304,7 +315,8 @@ define :peregrino [
             \stats\[command]: []
             [calibrator, timeForOne]: \calibrate command
 
-            if zero? calculatedTimes: <= minimumRunningTime / to :integer timeForOne ->
+            ; (commands taking less than 1ms would lead to a division by zero)
+            if zero? calculatedTimes: <= to :integer minimumRunningTime / max @[1.0, timeForOne] ->
                 calculatedTimes: 3
 
             runs: times ?? calculatedTimes
@@ -320,7 +332,7 @@ define :peregrino [
                     output: execute command
                 ])
                 if x = runs [
-                    estimate: nicefloat (average map \stats\[command] => scalar) - calibrator
+                    estimate: nicefloat max @[0.0, (average map \stats\[command] => scalar) - calibrator]
                     bar\message: \idealMsg commandId command
                     bar\label: (pad.right ~"~ |estimate|/run" 17) ++ pad.right \E\timer 3
                 ]
