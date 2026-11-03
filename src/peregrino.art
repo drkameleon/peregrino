@@ -239,6 +239,27 @@ define :peregrino [
         write.json cleaned targetFile
     ]
 
+    exportToCsv: method [target][
+        ; same data as the Json export (all times in ms)
+        quoted: function [str][
+            "\"" ++ (replace str "\"" "\"\"") ++ "\""
+        ]
+        fields: keys get first \final 'data
+        lines: @[join.with:"," ["cmd"] ++ fields ++ ["outliers"]]
+        loop \final 'entry [
+            lines: lines ++ join.with:"," flatten @[
+                quoted entry\cmd
+                map fields 'f -> entry\data\[f]
+                to :string entry\outliers?
+            ]
+        ]
+        targetFile: target
+        if empty? extract.extension targetFile ->
+            targetFile: targetFile ++ ".csv"
+
+        write (join.with:"\n" lines) ++ "\n" targetFile
+    ]
+
     exportToMarkdown: method [target][
         oldT: \T
         oldColorless?: \colorless?
