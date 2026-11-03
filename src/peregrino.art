@@ -19,7 +19,9 @@ import ./{helpers/styles}!
 
 define :peregrino [
     init: method [commands][
-        \commands: commands
+        ; command-line values like `true` or `42`
+        ; are not strings, so make sure they are
+        \commands: map commands 'cmd -> to :string cmd
         \stats: #[]
         \columns: @[
             #[header:"Command"      short:"Command"     format:{|filename| (*)}]
