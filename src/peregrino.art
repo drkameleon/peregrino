@@ -125,7 +125,7 @@ define :peregrino [
         if empty? extract.extension targetFile ->
             targetFile: targetFile ++ ".json"
 
-        write.pretty.json targetFile cleaned
+        write.json cleaned targetFile
     ]
 
     exportToMarkdown: method [target][
