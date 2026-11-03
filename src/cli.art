@@ -94,6 +94,7 @@ cmd: to :cmdline #[
         @["a" "ascii"       [:logical] ""           "Use simple style, with ASCII-only characters"  false]
         @["c" "colorless"   [:logical] ""           "Don't use colored output"                      false]
         ø
+        @[""  "csv"         [:string]  "file"       "Export CSV to given file"                      ""]
         @[""  "markdown"    [:string]  "file"       "Export Markdown to given file"                 ""]
         @[""  "json"        [:string]  "file"       "Export Json to give file"                      ""]
     ]
@@ -145,6 +146,9 @@ unless null? err [
     print ""
     panic.unstyled.code: 1 "  Use `--ignore-failure` to ignore non-zero exit codes\n"
 ]
+
+unless empty? optCsv ->
+    pr\exportToCsv optCsv
 
 unless empty? optJson ->
     pr\exportToJson optJson

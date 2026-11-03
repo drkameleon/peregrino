@@ -82,6 +82,7 @@ Options:
     -a, --ascii                 Use simple style, with ASCII-only characters 
     -c, --colorless             Don't use colored output 
 
+        --csv <file>            Export CSV to given file 
         --markdown <file>       Export Markdown to given file 
         --json <file>           Export Json to give file 
 
