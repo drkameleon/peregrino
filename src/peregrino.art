@@ -27,6 +27,9 @@ commandFailed: to :errorKind "Command failed"
 ; thrown when a command takes longer than the given `.timeout`
 commandTimedOut: to :errorKind "Command timed out"
 
+; thrown when the given `.prepare` command fails
+preparationFailed: to :errorKind "Preparation failed"
+
 ;---------------------------
 ; Running in the background
 ;---------------------------
@@ -58,6 +61,16 @@ runInBackground: function [cmd, bar, limit][
         return null
     ]
     return wait task
+]
+
+;---------------------------
+; Preparation
+;---------------------------
+
+prepareRun: function [prep][
+    ; run the preparation command (if any) and return its exit code
+    if null? prep -> return 0
+    return get execute.code prep 'code
 ]
 
 ;---------------------------
@@ -93,6 +106,9 @@ define :peregrino [
         \ignoreFailure?: not? null? attr 'ignoreFailure
         \warmupRuns: (attr 'warmup) ?? 1
         \timeout: attr 'timeout
+        \prepare: attr 'prepare
+        unless null? \prepare ->
+            \prepare: to :string \prepare
         
         \minimal?: not? null? attr 'minimal
         \ascii?: not? null? attr 'ascii
@@ -338,6 +354,11 @@ define :peregrino [
         return truncateLeft msg terminal\width / 2
     ]
 
+    ensurePrepared: method [exitCode][
+        unless zero? exitCode ->
+            throw.as: preparationFailed \prepare ++ " (exit code: " ++ (to :string exitCode) ++ ")"
+    ]
+
     ensureSuccess: method [cmd, exitCode][
         if \ignoreFailure? -> return null
         unless zero? exitCode ->
@@ -386,10 +407,14 @@ define :peregrino [
         timings: []
         exitCodes: []
         limit: \timeout
+        prep: \prepare
+        prepCode: 0
         timedOut?: false
         bar: \newBar "Warming up:" warmupRuns false
         loop warmupRuns 'x [
             unless timedOut? [
+                if zero? prepCode ->
+                    prepCode: prepareRun prep
                 'timings ++ to :floating scalar benchmark.get [
                     result: runInBackground cmd bar limit
                 ]
@@ -414,6 +439,8 @@ define :peregrino [
             unless minimal? ->
                 prints "\e[A\r\e[J"
         ]
+
+        \ensurePrepared prepCode
 
         ; a command that doesn't finish, cannot be benchmarked
         ; (regardless of `.ignoreFailure`)
@@ -468,7 +495,11 @@ define :peregrino [
             bar\processing: \idealMsg commandId command
             bar\increase 0
             exitCode: 0
+            prep: \prepare
+            prepCode: 0
             loop runs 'x [
+                if zero? prepCode ->
+                    prepCode: prepareRun prep
                 samples: samples ++ (benchmark.get [
                     result: execute.code command
                 ])
@@ -481,6 +512,7 @@ define :peregrino [
                 ]
                 bar\increase 1
             ]
+            \ensurePrepared prepCode
             \ensureSuccess command exitCode
             ; (one entry per command, even if the same command is given twice)
             \stats: \stats ++ @[#[
