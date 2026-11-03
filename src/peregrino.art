@@ -20,6 +20,10 @@ import ./{helpers/stats}
 import ./{helpers/strings}
 import ./{helpers/styles}!
 
+; thrown when a benchmarked command doesn't
+; exit successfully (= with a non-zero code)
+commandFailed: to :errorKind "Command failed"
+
 define :peregrino [
     init: method [commands][
         ; command-line values like `true` or `42`
@@ -35,6 +39,7 @@ define :peregrino [
         ]
 
         \final: []
+        \ignoreFailure?: not? null? attr 'ignoreFailure
         
         \minimal?: not? null? attr 'minimal
         \ascii?: not? null? attr 'ascii
@@ -280,8 +285,15 @@ define :peregrino [
         return truncateLeft msg terminal\width / 2
     ]
 
+    ensureSuccess: method [cmd, exitCode][
+        if \ignoreFailure? -> return null
+        unless zero? exitCode ->
+            throw.as: commandFailed ~"|cmd| (exit code: |exitCode|)"
+    ]
+
     calibrate: function [cmd][
         calvalues: []
+        exitCodes: []
         timeForOne: 0.001
         if \ascii? -> do [.plain]
         if \colorless? -> do [.colorless]
@@ -294,13 +306,17 @@ define :peregrino [
                 ]
             ][
                 'calvalues ++ to :floating scalar benchmark.get [
-                    output: execute cmd
-                ]  
+                    result: execute.code cmd
+                ]
+                'exitCodes ++ result\code
             ]
         ]
         ; remove the (final) calibration line
         unless \minimal? ->
             prints "\e[A\r\e[J"
+
+        ; no need to go any further, if the command doesn't even work
+        \ensureSuccess cmd last exitCodes
 
         return @[to :floating (sum first.n:9 calvalues)/9, last calvalues]
     ]
@@ -330,10 +346,13 @@ define :peregrino [
             bar: progressive\new .label:pad.right "Benchmarking:" 20 runs!
             bar\processing: \idealMsg commandId command
             bar\increase 0
+            exitCode: 0
             loop runs 'x [
                 \stats\[command]: \stats\[command] ++ (benchmark.get [
-                    output: execute command
+                    result: execute.code command
                 ])
+                unless zero? result\code ->
+                    exitCode: result\code
                 if x = runs [
                     estimate: nicefloat max @[0.0, (average map \stats\[command] => scalar) - calibrator]
                     bar\message: \idealMsg commandId command
@@ -341,6 +360,7 @@ define :peregrino [
                 ]
                 bar\increase 1
             ]
+            \ensureSuccess command exitCode
             \stats\[command]: map \stats\[command] 'v -> to :floating (scalar v) - calibrator
             unless \minimal? ->
                 prints "\n"

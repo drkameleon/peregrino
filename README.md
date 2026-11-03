@@ -73,6 +73,7 @@ Options:
     -r, --run <times>           Specify number of times to run each command 
     -f, --file                  Read commands from text file (one per line) 
     -p, --params <string>       Use custom params in command 
+    -i, --ignore-failure        Ignore non-zero exit codes 
 
     -m, --minimal               No fancy output; just the data! 
     -a, --ascii                 Use simple style, with ASCII-only characters 
