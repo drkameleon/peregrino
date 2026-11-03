@@ -94,7 +94,12 @@ define :peregrino [
     ]
 
     finalizeData: method [][
-        stats: map \stats [k, v] -> extend getStats v #[cmd: k]
+        stats: map \stats [k, v] [
+            ; a run can never take less than 0ms; if it did, it means
+            ; that it took less than our calibration measurement (= the
+            ; shell spawning overhead)
+            extend getStats map v 'x -> max @[0.0, x] #[cmd: k]
+        ]
         bestAvg: min map stats 'v -> v\data\avg
         loop stats 'v [
             ; there's no meaningful comparison against 0 (= null)
@@ -312,10 +317,7 @@ define :peregrino [
                 ]
                 bar\increase 1
             ]
-            ; a run can never take less than 0ms; if it did, it means
-            ; that it took less than our calibration measurement (= the
-            ; shell spawning overhead)
-            \stats\[command]: map \stats\[command] 'v -> max @[0.0, (to :floating scalar v) - calibrator]
+            \stats\[command]: map \stats\[command] 'v -> to :floating (scalar v) - calibrator
             prints repeat "\b" terminal\width
             unless \minimal? ->
                 prints "\n"
