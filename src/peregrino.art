@@ -266,7 +266,10 @@ define :peregrino [
                 ]  
             ]
         ]
-        prints repeat "\b \b" terminal\width
+        ; remove the (final) calibration line
+        unless \minimal? ->
+            prints "\e[A\r\e[J"
+
         return @[to :floating (sum first.n:9 calvalues)/9, last calvalues]
     ]
 
@@ -306,7 +309,6 @@ define :peregrino [
                 bar\increase 1
             ]
             \stats\[command]: map \stats\[command] 'v -> to :floating (scalar v) - calibrator
-            prints repeat "\b" terminal\width
             unless \minimal? ->
                 prints "\n"
         ]
