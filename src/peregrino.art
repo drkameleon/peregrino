@@ -12,7 +12,7 @@
 ;===============================================
 
 ; current version (used by the CLI too)
-peregrinoVersion: "1.0.0"
+peregrinoVersion: "0.1.0"
 
 import {progressive}
 
