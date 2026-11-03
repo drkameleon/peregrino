@@ -94,14 +94,6 @@ define :peregrino [
         ; are not strings, so make sure they are
         \commands: map commands 'cmd -> to :string cmd
         \stats: []
-        \columns: @[
-            #[header:"Command"      short:"Command"     format:{|filename| (*)}]
-            #[header:"Average"      short:"Avg"         format:{|row\data\avg|}]
-            #[header:"Comparison"   short:"Cmp"         format:{+ |row\data\rel|%}]
-            #[header:"Deviation"    short:"Dev"         format:{± |row\data\dev|}]
-            #[header:"Range"        short:"Range"       format:{|row\data\min| .. |row\data\max|}]
-        ]
-
         \final: []
         \ignoreFailure?: not? null? attr 'ignoreFailure
         \warmupRuns: (attr 'warmup) ?? 1
@@ -113,6 +105,16 @@ define :peregrino [
         \minimal?: not? null? attr 'minimal
         \ascii?: not? null? attr 'ascii
         \colorless?: not? null? attr 'colorless
+
+        plusMinus: (\ascii?)? -> "+/-" -> "±"
+        times: (\ascii?)? -> "x" -> "×"
+        \columns: @[
+            #[header:"Command"      short:"Command"     format:{|filename| (*)}]
+            #[header:"Average"      short:"Avg"         format:{|withUnit row\data\avg|}]
+            #[header:"Comparison"   short:"Cmp"         format:{|row\data\ratio|} ++ times ++ " slower"]
+            #[header:"Deviation"    short:"Dev"         format:plusMinus ++ " " ++ {|withUnit row\data\dev|}]
+            #[header:"Range"        short:"Range"       format:{|withUnit row\data\min| .. |withUnit row\data\max|}]
+        ]
         \mdMode?: false
 
         \T: (\ascii?) ? -> _tbl\ascii -> _tbl\normal
@@ -200,6 +202,12 @@ define :peregrino [
                 (zero? v\data\avg)? -> 0.0 -> null
             ][
                 100 * (v\data\avg - bestAvg) / bestAvg
+            ]
+            ; = how many times slower than the fastest one
+            v\data\ratio: switch zero? bestAvg [
+                (zero? v\data\avg)? -> 1.0 -> null
+            ][
+                v\data\avg / bestAvg
             ]
         ]
 
@@ -296,8 +304,8 @@ define :peregrino [
                                 \colored #gray pad.center ~ c\format c\min + 2
                             ]
                             "Comparison" [
-                                txt: (empty? row\data\rel)? -> "n/a" -> ~ c\format
-                                ("+ 0.00%" = txt) ?
+                                txt: (empty? row\data\ratio)? -> "n/a" -> ~ c\format
+                                ("1.00" = row\data\ratio) ?
                                     -> pad.center "--" c\min + 2
                                     -> pad.center txt c\min + 2
                             ]
@@ -332,8 +340,8 @@ define :peregrino [
         (\minimal?)?[
             loop \final 'entry [
                 print " - " ++ ((entry = first \final)? -> \colored #green entry\cmd -> entry\cmd) ++ (entry\outliers? ? -> \colored #gray " (*)" -> "")
-                print "       " ++ "avg: " ++ entry\data\avg ++ (\colored #gray " +/- " ++ entry\data\dev)
-                print "       " ++ "rng: " ++ entry\data\min ++ " .. " ++ entry\data\max
+                print "       " ++ "avg: " ++ (withUnit entry\data\avg) ++ (\colored #gray " +/- " ++ withUnit entry\data\dev)
+                print "       " ++ "rng: " ++ (withUnit entry\data\min) ++ " .. " ++ withUnit entry\data\max
                 print " "
             ]
         ][
@@ -349,7 +357,7 @@ define :peregrino [
     ]
 
     idealMsg: function [msgId, msg][
-        if terminal\width < 80 -> return ~"#|msgId|"
+        if terminal\width < 80 -> return truncateLeft msg terminal\width / 4
         if terminal\width < 120 -> return truncateLeft msg terminal\width / 3
         return truncateLeft msg terminal\width / 2
     ]
@@ -509,7 +517,7 @@ define :peregrino [
                 if x = runs [
                     estimate: nicefloat max @[0.0, (average map samples => scalar) - calibrator]
                     bar\message: \idealMsg commandId command
-                    bar\label: (pad.right ~"~ |estimate|/run" 17) ++ pad.right \E\timer 3
+                    bar\label: (pad.right ~"~ |withUnit estimate|/run" 17) ++ pad.right \E\timer 3
                 ]
                 bar\increase 1
             ]
