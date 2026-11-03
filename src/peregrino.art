@@ -288,7 +288,8 @@ define :peregrino [
     ensureSuccess: method [cmd, exitCode][
         if \ignoreFailure? -> return null
         unless zero? exitCode ->
-            throw.as: commandFailed ~"|cmd| (exit code: |exitCode|)"
+            ; (no string interpolation here: commands may well contain `|`s)
+            throw.as: commandFailed cmd ++ " (exit code: " ++ (to :string exitCode) ++ ")"
     ]
 
     calibrate: function [][
