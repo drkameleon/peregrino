@@ -35,6 +35,11 @@ truncateLeft: function [str,lim][
     return pref ++ last.n: min @[lim - size pref, (size str) - size pref] str
 ]
 
+escapeMarkdown: function [str][
+    ; pipes would break the table
+    replace str "|" "\\|"
+]
+
 spacer: function [len][
     repeat " " len
 ]

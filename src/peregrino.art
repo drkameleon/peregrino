@@ -36,6 +36,7 @@ define :peregrino [
         \minimal?: not? null? attr 'minimal
         \ascii?: not? null? attr 'ascii
         \colorless?: not? null? attr 'colorless
+        \mdMode?: false
 
         \T: (\ascii?) ? -> _tbl\ascii -> _tbl\normal
         \E: (\ascii?) ? -> _elements\ascii -> _elements\normal
@@ -70,6 +71,11 @@ define :peregrino [
             ]
             minNeeded: minNeeded + col\min + 2
         ]
+        ; in Markdown, there is no terminal width to fit in:
+        ; just make room for the longest command (+ the outliers mark)
+        if \mdMode? -> 
+            return \getMarkdownColumns columns
+
         minNeeded: minNeeded + 
                     2 +  ; spaces front/back
                     6    ; line separators
@@ -92,6 +98,14 @@ define :peregrino [
             ]
         ]
 
+        return columns
+    ]
+
+    getMarkdownColumns: method [columns][
+        columns\0\min: 4 + max @[
+            size columns\0\header
+            max map \final 'row -> size escapeMarkdown row\cmd
+        ]
         return columns
     ]
 
@@ -135,22 +149,23 @@ define :peregrino [
         oldColorless?: \colorless?
         \T: _tbl\markdown
         \colorless?: true
+        \mdMode?: true
 
-        do [.md]
         tblMd: \getTable
 
         \T: oldT
         \colorless?: oldColorless?
+        \mdMode?: false
 
         targetFile: target
         if empty? extract.extension targetFile ->
             targetFile: targetFile ++ ".md"
 
-        write targetFile tblMd
+        write tblMd targetFile
     ]
 
     getTable: method [][
-        mdMode?: not? null? attr 'md
+        mdMode?: \mdMode?
 
         cols: \getColumns
  
@@ -167,7 +182,7 @@ define :peregrino [
         ]
         
         ; header
-        tbl: tbl ++ "   " ++ (join.with:\T\verLine map.with:'i cols 'c [
+        tbl: tbl ++ ((mdMode?)? -> " " ++ \T\verLine ++ " " -> "   ") ++ (join.with:\T\verLine map.with:'i cols 'c [
                 (i=0)? -> pad.right c\header c\min + 1
                        -> pad.center c\header c\min + 2
             ]) ++ \T\verLine
@@ -184,7 +199,8 @@ define :peregrino [
             tbl: tbl ++ " " ++ \T\verLine ++ " " ++ (
                 join.with:\T\verLine map.with:'i cols 'c [
                     str: switch i=0 [
-                        filename: truncateLeft row\cmd c\min - 8
+                        filename: (mdMode?)? -> escapeMarkdown row\cmd
+                                             -> truncateLeft row\cmd c\min - 8
                         (pad.right replace ~ c\format "(*)" "" c\min + 1 - (row\outliers? ? -> 4 -> 0)) ++
                             (row\outliers? ? -> \colored #gray "(*) " -> "")
                     ][
