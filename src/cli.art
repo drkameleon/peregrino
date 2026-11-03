@@ -81,7 +81,7 @@ cmd: to :cmdline #[
         @["c" "colorless"   [:logical] ""           "Don't use colored output"                      false]
         ø
         @[""  "markdown"    [:string]  "file"       "Export Markdown to given file"                 ""]
-        @[""  "json"        [:string]  "file"       "Export Json to give file"                      ""]
+        @[""  "json"        [:string]  "file"       "Export Json to given file"                      ""]
     ]
 ]!
 export cmd\processing args
