@@ -139,7 +139,8 @@ define :cmdline [
 
         exportable: #[]
         loop \options 'entry [
-            subname: capitalize entry\1
+            ; e.g. "ignore-failure" => "IgnoreFailure"
+            subname: join map split.by:"-" entry\1 => capitalize
 
             finalName: "opt" ++ subname
 

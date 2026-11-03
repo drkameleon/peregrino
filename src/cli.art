@@ -70,6 +70,7 @@ cmd: to :cmdline #[
         @["r" "run"         [:integer] "times"      "Specify number of times to run each command"   ø]
         @["f" "file"        [:logical] ""           "Read commands from text file (one per line)"   false]
         @["p" "params"      [:string]  "string"     "Use custom params in command"                  ""]
+        @["i" "ignore-failure" [:logical] ""        "Ignore non-zero exit codes"                    false]
         ø
         @["m" "minimal"     [:logical] ""           "No fancy output; just the data!"               false]
         @["a" "ascii"       [:logical] ""           "Use simple style, with ASCII-only characters"  false]
@@ -84,12 +85,26 @@ export cmd\processing args
 if optAscii -> do [.ascii]
 if optColorless -> do [.colorless]
 if optMinimal -> do [.minimal]
+if optIgnoreFailure -> do [.ignoreFailure]
 
 if empty? optValues ->
     cmd\showError "Not enough arguments"
 
 pr: to :peregrino @[getCommands]!
-pr\benchmark optRun
+
+err: try [
+    pr\benchmark optRun
+]
+unless null? err [
+    ; not one of ours, so let's not hide it
+    if err\kind <> commandFailed ->
+        throw.as: err\kind err\message
+
+    print ""
+    print [color #red "!" "Command failed:" err\message]
+    print ""
+    panic.unstyled.code: 1 "  Use `--ignore-failure` to ignore non-zero exit codes\n"
+]
 
 unless empty? optJson ->
     pr\exportToJson optJson
