@@ -291,34 +291,51 @@ define :peregrino [
             throw.as: commandFailed ~"|cmd| (exit code: |exitCode|)"
     ]
 
-    calibrate: function [cmd][
+    calibrate: function [][
+        ; measure the overhead of spawning a shell (just once, since it's
+        ; the same for all commands), so that we can subtract it from every
+        ; single run afterwards
         calvalues: []
-        exitCodes: []
-        timeForOne: 0.001
         if \ascii? -> do [.plain]
         if \colorless? -> do [.colorless]
         if \minimal? -> do [.simple .hide]
-        progressive\loop .ratioless .label: pad.right "Calibrating:" 20 10 'x [
-            (x < 10)?[ 
-                pause 50
-                'calvalues ++ scalar benchmark.get [
-                    output: execute ""
-                ]
-            ][
-                'calvalues ++ to :floating scalar benchmark.get [
-                    result: execute.code cmd
-                ]
-                'exitCodes ++ result\code
+        progressive\loop .ratioless .label: pad.right "Calibrating:" 20 20 'x [
+            pause 20
+            'calvalues ++ to :floating scalar benchmark.get [
+                output: execute ""
             ]
         ]
         ; remove the (final) calibration line
         unless \minimal? ->
             prints "\e[A\r\e[J"
 
-        ; no need to go any further, if the command doesn't even work
-        \ensureSuccess cmd last exitCodes
+        ; (the median, so that a random hiccup doesn't affect everything)
+        return median calvalues
+    ]
 
-        return @[to :floating (sum first.n:9 calvalues)/9, last calvalues]
+    warmup: function [cmd][
+        ; run the command (without measuring it), to make sure it works
+        ; + get an idea of how long it takes
+        timings: []
+        exitCodes: []
+        if \ascii? -> do [.plain]
+        if \colorless? -> do [.colorless]
+        if \minimal? -> do [.simple .hide]
+        progressive\loop .ratioless .label: pad.right "Warming up:" 20 1 'x [
+            'timings ++ to :floating scalar benchmark.get [
+                result: execute.code cmd
+            ]
+            'exitCodes ++ result\code
+        ]
+        ; remove the (final) warm-up line
+        unless \minimal? ->
+            prints "\e[A\r\e[J"
+
+        ; no need to go any further, if the command doesn't even work
+        loop exitCodes 'exitCode ->
+            \ensureSuccess cmd exitCode
+
+        return average timings
     ]
 
     benchmark: method [times][
@@ -332,10 +349,12 @@ define :peregrino [
 
         minimumRunningTime: 3000
 
+        calibrator: \calibrate
+
         loop.with:'commandId \commands 'command [
             
             samples: []
-            [calibrator, timeForOne]: \calibrate command
+            timeForOne: \warmup command
 
             ; (commands taking less than 1ms would lead to a division by zero)
             if zero? calculatedTimes: <= to :integer minimumRunningTime / max @[1.0, timeForOne] ->
