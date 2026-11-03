@@ -118,7 +118,7 @@ define :cmdline [
     ]
 
     unrecognizedParameter: method [which][
-        \showError "Unrecognized parameter: " ++ (color.bold #white name)
+        \showError "Unrecognized parameter: " ++ (color.bold #white which)
     ]
 
     wrongParameter: method [which, expected, val][
